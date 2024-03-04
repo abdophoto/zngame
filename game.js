@@ -1,92 +1,90 @@
-const outputElement = document.getElementById('output');
-const inputElement = document.getElementById('input');
-let playerInput = '';
-let currentPlayer = '';
-let mazeSize = 5; // Adjust the maze size as needed
-let playerPosition = { x: 0, y: 0 };
-let soccerBallPosition = { x: getRandomPosition(), y: getRandomPosition() };
-let gameOver = false;
+const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 0 },
+            enableBody: true,
+        },
+    },
+    scene: {
+        preload: preload,
+        create: create,
+        update: update,
+    },
+};
 
-function getRandomPosition() {
-    return Math.floor(Math.random() * mazeSize);
+const game = new Phaser.Game(config);
+
+let player;
+let cursors;
+let balls;
+let walls;
+
+function preload() {
+    this.load.image('zane', 'zane.png');
+    this.load.image('noora', 'noora.png');
+    this.load.image('ball', 'soccer_ball.png');
+    this.load.image('wall', 'maze_wall.png');
 }
 
-function drawMaze() {
-    let maze = '';
-    for (let i = 0; i < mazeSize; i++) {
-        for (let j = 0; j < mazeSize; j++) {
-            if (i === playerPosition.y && j === playerPosition.x) {
-                maze += currentPlayer === 'zane' ? 'Z' : 'N';
-            } else if (i === soccerBallPosition.y && j === soccerBallPosition.x) {
-                maze += 'B';
-            } else {
-                maze += '-';
-            }
-            maze += ' ';
-        }
-        maze += '\n';
-    }
-    updateOutput(maze);
+function create() {
+    // Create maze walls
+    walls = this.physics.add.staticGroup();
+    walls.create(400, 50, 'wall').setScale(4, 0.5).refreshBody();
+    walls.create(400, 550, 'wall').setScale(4, 0.5).refreshBody();
+    walls.create(50, 300, 'wall').setScale(0.5, 4).refreshBody();
+    walls.create(750, 300, 'wall').setScale(0.5, 4).refreshBody();
+
+    // Create players
+    player = this.physics.add.sprite(100, 100, 'zane');
+    player.setCollideWorldBounds(true);
+
+    // Create soccer balls
+    balls = this.physics.add.group({
+        key: 'ball',
+        repeat: 3,
+        setXY: { x: 400, y: 300, stepX: 100 },
+    });
+
+    balls.children.iterate(function (ball) {
+        ball.setBounce(1);
+        ball.setCollideWorldBounds(true);
+        ball.setVelocity(Phaser.Math.Between(-200, 200), Phaser.Math.Between(-200, 200));
+    });
+
+    // Set up collisions
+    this.physics.add.collider(player, walls);
+    this.physics.add.collider(balls, walls);
+    this.physics.add.collider(player, balls, hitBall, null, this);
+
+    // Set up input
+    cursors = this.input.keyboard.createCursorKeys();
 }
 
-function moveSoccerBall() {
-    soccerBallPosition = { x: getRandomPosition(), y: getRandomPosition() };
-}
-
-function checkCollision() {
-    if (playerPosition.x === soccerBallPosition.x && playerPosition.y === soccerBallPosition.y) {
-        gameOver = true;
-        updateOutput(`${currentPlayer} got hit by a soccer ball! Game Over.`);
-    }
-}
-
-function checkWin() {
-    if (playerPosition.x === mazeSize - 1 && playerPosition.y === mazeSize - 1) {
-        gameOver = true;
-        updateOutput(`${currentPlayer} successfully navigated through the maze and won the game!`);
-    }
-}
-
-function submitInput() {
-    if (gameOver) {
-        updateOutput('The game is over. Please refresh the page to play again.');
-        return;
-    }
-
-    playerInput = inputElement.value.toLowerCase();
-    inputElement.value = '';
-
-    if (!currentPlayer) {
-        if (playerInput === 'zane' || playerInput === 'noora') {
-            currentPlayer = playerInput;
-            updateOutput(`Welcome, ${currentPlayer}! You find yourself in a maze. Avoid the soccer balls and find your way out.`);
-            drawMaze();
-        } else {
-            updateOutput("Invalid choice. Please choose either 'Zane' or 'Noora'.");
-        }
+function update() {
+    // Player movement
+    if (cursors.left.isDown) {
+        player.setVelocityX(-160);
+    } else if (cursors.right.isDown) {
+        player.setVelocityX(160);
     } else {
-        switch (playerInput) {
-            case 'move':
-                // Move player within the maze
-                playerPosition.x = Math.max(0, Math.min(playerPosition.x + 1, mazeSize - 1));
-                playerPosition.y = Math.max(0, Math.min(playerPosition.y + 1, mazeSize - 1));
+        player.setVelocityX(0);
+    }
 
-                checkCollision();
-                checkWin();
-                drawMaze();
-                moveSoccerBall();
-                break;
-            default:
-                updateOutput(`Invalid input. Type 'move' to continue.`);
-                break;
-        }
+    if (cursors.up.isDown) {
+        player.setVelocityY(-160);
+    } else if (cursors.down.isDown) {
+        player.setVelocityY(160);
+    } else {
+        player.setVelocityY(0);
     }
 }
 
-// Example function to update the game output
-function updateOutput(message) {
-    outputElement.innerHTML = `<pre>${message}</pre>`;
+function hitBall(player, ball) {
+    // Handle player getting hit by a ball (you can customize this)
+    player.setTint(0xff0000);
+    this.physics.pause();
 }
-
-// Start the game by introducing characters
-updateOutput('Choose your character: Zane or Noora.');
